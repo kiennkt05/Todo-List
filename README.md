@@ -113,7 +113,3 @@ Giữ nguyên môi trường và số vòng khi so sánh. SQLite một file và 
 | Bảo trì | Khi tăng chức năng cần hợp đồng rõ hơn | Unit test nghiệp vụ, integration test DB, CI | Tỷ lệ pass và thời gian test trên mỗi commit |
 
 Đây là danh sách giả thuyết cho Pha 2; chọn ưu tiên sau khi có số liệu Kaggle CPU.
-
-## GitHub
-
-Mã nguồn sẵn để đưa lên repository công khai. Nên commit theo từng bước có nghĩa: `chore: scaffold`, `feat: auth and tasks`, `test: API contracts`, `docs: architecture and benchmark`. Không commit `.env`, `data/` hoặc token. Đường dẫn GitHub công khai do nhóm tạo và thêm vào README khi xuất bản.
