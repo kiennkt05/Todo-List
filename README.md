@@ -2,6 +2,11 @@
 
 Dịch vụ quản lý công việc cá nhân. Mỗi tài khoản chỉ xem và sửa công việc của mình. API giao tiếp bằng JSON; Swagger UI có tại `/docs`, tài liệu OpenAPI JSON tại `/openapi.json` và bản đặc tả tĩnh trong [`openapi.json`](openapi.json).
 
+Bài toán đặt ra là xây dựng một hệ thống để mỗi người dùng có thể tạo công việc, theo dõi danh sách, cập nhật trạng thái hoàn thành và xóa những công việc không còn cần thiết.
+
+Yêu cầu quan trọng nhất là tách biệt dữ liệu giữa các tài khoản. Người dùng chỉ được xem và thao tác trên công việc của mình. Ví dụ, tài khoản A tạo một công việc thì tài khoản B không được xem, cập nhật hay xóa công việc đó, kể cả khi biết ID.
+
+
 ## Phạm vi nghiệp vụ
 
 - Đăng ký bằng email và mật khẩu; email không phân biệt hoa thường, không được trùng.
