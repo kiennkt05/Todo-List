@@ -1,0 +1,101 @@
+INFO:     Started server process [306]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:60757 (Press CTRL+C to quit)
+INFO:     127.0.0.1:35192 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35202 - "POST /api/auth/register HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35216 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35226 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35240 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35244 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35248 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35260 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35268 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35272 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35278 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35288 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35296 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35302 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35304 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35314 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35320 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35330 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35342 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35348 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35356 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35358 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35366 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35376 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35388 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35390 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35402 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35406 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35416 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35428 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35440 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35442 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35444 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35460 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35466 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35468 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35474 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35484 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35496 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35510 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35514 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35530 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35544 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35548 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35564 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35570 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35578 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35588 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35592 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35604 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35608 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35614 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35616 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35630 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35642 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35650 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35652 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35660 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35664 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35674 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35684 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35696 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35706 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35712 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35720 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35730 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35742 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35756 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35772 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35784 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35794 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35802 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35814 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35822 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35824 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35836 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35844 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35852 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35868 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35878 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35892 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35896 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35906 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35908 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35910 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35924 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35928 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35932 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35944 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35960 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35966 - "POST /api/tasks HTTP/1.1" 201 Created
+INFO:     127.0.0.1:35980 - "GET /api/tasks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35990 - "DELETE /api/tasks/1 HTTP/1.1" 204 No Content
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [306]

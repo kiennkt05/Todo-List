@@ -1,0 +1,14 @@
+{
+  "label": "c8-r2",
+  "kind": "baseline",
+  "repeat": 2,
+  "concurrency": 8,
+  "iterations": 100,
+  "orchestration_status": "completed",
+  "benchmark_exit_code": 0,
+  "report_status": "completed",
+  "error": null,
+  "started_at_utc": "2026-10-27T15:44:27.305148+00:00",
+  "server_exit_code": -15,
+  "finished_at_utc": "2026-10-27T15:45:09.440273+00:00"
+}

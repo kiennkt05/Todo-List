@@ -1,0 +1,14 @@
+{
+  "label": "c1-r3",
+  "kind": "baseline",
+  "repeat": 3,
+  "concurrency": 1,
+  "iterations": 100,
+  "orchestration_status": "completed",
+  "benchmark_exit_code": 0,
+  "report_status": "completed",
+  "error": null,
+  "started_at_utc": "2026-10-27T15:45:09.448518+00:00",
+  "server_exit_code": -15,
+  "finished_at_utc": "2026-10-27T15:45:16.575255+00:00"
+}
