@@ -114,18 +114,45 @@ Giữ nguyên môi trường và số vòng khi so sánh. SQLite một file và 
 python kaggle/benchmark.py --concurrency 2 --iterations 3 --output-json results/run.json
 ```
 
-Mỗi bản ghi có `worker_id`, `iteration` (đều bắt đầu từ 0), `method`, `status`, `latency_ms` và `success` theo HTTP status mong đợi. Báo cáo JSON và terminal dùng chung dữ liệu tổng hợp:
+Mỗi bản ghi có `worker_id`, `iteration` (đều bắt đầu từ 0), `method`, `status`, `latency_ms`, `success`, `error_type` và `error_message`. `status` là `null` nếu chưa nhận được HTTP response. Request chỉ thành công khi status đúng, response hợp lệ và (với GET) thấy task vừa tạo. Không lưu body, mật khẩu hoặc token vào các bản ghi. Báo cáo JSON và terminal dùng chung dữ liệu tổng hợp:
 
 - `expected_requests`: `3 × concurrency × iterations`, không gồm đăng ký/login.
-- `attempted_requests`, `successful_requests`, `failed_requests`: số request task thực hiện, đúng status và sai status.
+- `attempted_requests`, `successful_requests`, `failed_requests`: số request task có bản ghi, thành công và thất bại, bao gồm cả timeout/lỗi mạng/response không hợp lệ.
 - `skipped_requests`: POST lỗi làm bỏ qua GET/DELETE, cộng 2 cho mỗi vòng đó.
 - `completed_cycles`: chỉ tăng khi tạo thành công, GET thành công và thấy task vừa tạo, DELETE thành công. GET lỗi hoặc không thấy task vẫn thử DELETE.
 - `expected_cycles`, `incomplete_cycles`: số vòng mục tiêu và số vòng không hoàn tất thành công.
-- `methods`: số mẫu, mean/p50/p95 tính trên mọi response HTTP của từng method; `measurements`: toàn bộ bản ghi request. Method không có mẫu có latency `null`.
+- `unrecorded_requests`: phần công việc chưa có bản ghi và không thuộc số request bị bỏ qua. Khi dừng sớm, không được coi số này là request thành công hoặc khẳng định chưa tới server.
+- `throughput_rps`: mọi request có bản ghi / thời gian đo; `success_throughput`: request thành công / thời gian đo, cùng đơn vị req/s. `error_rate`: request thất bại / request có bản ghi (từ 0 đến 1).
+- `methods`: `n` là mọi mẫu của method; `successful_requests`/`failed_requests` là số thành công/lỗi. Mean/p50/p95 **chỉ tính trên mẫu thành công**; không có mẫu thành công thì ghi `null` (terminal hiển thị `n/a`). `measurements` giữ dữ liệu từng request, kể cả lỗi.
+- `failures_by_status`, `failures_by_error_type`: số lỗi theo HTTP status và loại lỗi, có ở cấp toàn báo cáo và từng method. `no_response` nghĩa là chưa nhận status; status `200` vẫn có thể nằm trong nhóm lỗi nếu JSON sai hoặc thiếu task.
 
-Ví dụ trên khi thành công có 6 vòng hoàn thành, 18 request dự kiến/thực hiện/thành công, 0 request lỗi hoặc bị bỏ qua. Throughput vẫn tính mọi request đã thực hiện, kể cả response lỗi. Nếu có request sai status hoặc vòng không hoàn tất, script ghi JSON trước rồi thoát với code 1. Trường hợp GET `200` nhưng thiếu task vẫn được tính là HTTP thành công, nhưng vòng không hoàn tất và lần chạy thất bại.
+Ví dụ trên khi thành công có 6 vòng hoàn thành, 18 request dự kiến/thực hiện/thành công, 0 request lỗi hoặc bị bỏ qua. Khi chưa đo được thời gian (setup thất bại), throughput là `null`; khi chưa có request task, `error_rate` là `null`.
 
-Đợt 1 chưa bổ sung xử lý timeout/lỗi mạng/response không hợp lệ hoặc lưu báo cáo khi có exception bất ngờ; các lỗi này vẫn có thể làm script dừng trước khi ghi JSON.
+Các loại lỗi request:
+
+| `error_type` | Ý nghĩa |
+|---|---|
+| `http_error` | Status khác kỳ vọng; ưu tiên phân loại theo status ngay cả khi body lỗi không phải JSON |
+| `timeout` | Hết thời gian chờ kết nối hoặc đọc response (timeout hiện vẫn là 30 giây) |
+| `network_error` | Không kết nối được, kết nối bị đóng hoặc response bị ngắt khi đọc |
+| `invalid_response` | JSON lỗi, sai cấu trúc/thiếu ID hoặc token cần thiết, DELETE 204 có body |
+| `consistency_error` | GET trả 200 với danh sách hợp lệ nhưng không có task vừa tạo |
+
+Script không tự retry. POST thất bại bỏ qua hai bước còn lại; GET lỗi vẫn thử DELETE. Một task có thể còn lại nếu POST đã tới server nhưng client không nhận được ID, DELETE thất bại hoặc worker bị gián đoạn.
+
+`run_status` có ba giá trị:
+
+- `completed`: toàn bộ vòng thành công; exit code 0.
+- `completed_with_errors`: các worker kết thúc nhưng có request/vòng lỗi; exit code 1.
+- `aborted`: setup thất bại, worker gặp lỗi bất ngờ hoặc người chạy nhấn Ctrl+C; exit code 1. `run_errors` ghi giai đoạn (`setup`, `measurement`, `worker`), worker liên quan và nguyên nhân. Lỗi lập trình bất ngờ vẫn in traceback ra stderr.
+
+Khi một worker lỗi bất ngờ, báo cáo giữ các request đã ghi của worker đó và kết quả các worker khác. Khi nhận Ctrl+C, script hủy worker chưa chạy, chờ worker đang chạy kết thúc vòng hiện tại để thu dữ liệu rồi ghi báo cáo. Đăng ký/login không tính vào thống kê task; nếu setup lỗi, báo cáo `aborted` có 0 request task và chi tiết lỗi setup. Nếu có `--output-json`, báo cáo được ghi trước khi script trả exit code; bỏ tùy chọn này thì chỉ in terminal. Cần cho phép script kết thúc xử lý lỗi và ghi file: việc cưỡng bức kill tiến trình hoặc nơi lưu file không ghi được không bảo đảm có báo cáo.
+
+Chạy các test cho công cụ đo (mock timeout/lỗi mạng/response, báo cáo setup lỗi và worker gián đoạn):
+
+```bash
+python -m pytest -q tests/test_benchmark.py
+```
 
 ## Kế hoạch Pha 2
 
