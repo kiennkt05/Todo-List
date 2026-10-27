@@ -108,6 +108,25 @@ Các kiểm thử bao phủ đăng nhập, từ chối GET/POST không có token
 
 Giữ nguyên môi trường và số vòng khi so sánh. SQLite một file và một process Uvicorn là cấu hình cơ sở của Pha 1; kết quả đo là cơ sở để chọn cải tiến, không phải cam kết hiệu năng.
 
+Để lưu báo cáo cùng dữ liệu từng request (thư mục cha được tạo tự động):
+
+```bash
+python kaggle/benchmark.py --concurrency 2 --iterations 3 --output-json results/run.json
+```
+
+Mỗi bản ghi có `worker_id`, `iteration` (đều bắt đầu từ 0), `method`, `status`, `latency_ms` và `success` theo HTTP status mong đợi. Báo cáo JSON và terminal dùng chung dữ liệu tổng hợp:
+
+- `expected_requests`: `3 × concurrency × iterations`, không gồm đăng ký/login.
+- `attempted_requests`, `successful_requests`, `failed_requests`: số request task thực hiện, đúng status và sai status.
+- `skipped_requests`: POST lỗi làm bỏ qua GET/DELETE, cộng 2 cho mỗi vòng đó.
+- `completed_cycles`: chỉ tăng khi tạo thành công, GET thành công và thấy task vừa tạo, DELETE thành công. GET lỗi hoặc không thấy task vẫn thử DELETE.
+- `expected_cycles`, `incomplete_cycles`: số vòng mục tiêu và số vòng không hoàn tất thành công.
+- `methods`: số mẫu, mean/p50/p95 tính trên mọi response HTTP của từng method; `measurements`: toàn bộ bản ghi request. Method không có mẫu có latency `null`.
+
+Ví dụ trên khi thành công có 6 vòng hoàn thành, 18 request dự kiến/thực hiện/thành công, 0 request lỗi hoặc bị bỏ qua. Throughput vẫn tính mọi request đã thực hiện, kể cả response lỗi. Nếu có request sai status hoặc vòng không hoàn tất, script ghi JSON trước rồi thoát với code 1. Trường hợp GET `200` nhưng thiếu task vẫn được tính là HTTP thành công, nhưng vòng không hoàn tất và lần chạy thất bại.
+
+Đợt 1 chưa bổ sung xử lý timeout/lỗi mạng/response không hợp lệ hoặc lưu báo cáo khi có exception bất ngờ; các lỗi này vẫn có thể làm script dừng trước khi ghi JSON.
+
 ## Kế hoạch Pha 2
 
 | Thuộc tính | Vấn đề cần kiểm chứng | Cải tiến dự kiến | Cách đo |
