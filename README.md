@@ -183,6 +183,22 @@ Báo cáo có thêm metadata tại cấp ngoài:
 
 Script đọc Git theo thư mục mã nguồn, không theo thư mục đang gọi lệnh, và vẫn chạy được khi Git không có hoặc mã được tải về dưới dạng ZIP. Metadata không thu thập biến môi trường, token, mật khẩu hoặc URL API; CLI từ chối base URL chứa thông tin đăng nhập, query hoặc fragment. Số worker Uvicorn, chính sách reset/dùng lại database và môi trường server cần được ghi riêng trong notebook; client không tự suy ra các thông tin này. Giữ cùng cấu hình warm-up, timeout và database khi so sánh các lần đo.
 
+### Notebook chạy tải trên Kaggle
+
+Notebook [kaggle/load_test.ipynb](kaggle/load_test.ipynb) quản lý server, chạy tải và xuất biểu đồ:
+
+1. Import notebook lên Kaggle, dùng CPU và bật Internet nếu cần clone repository/cài dependencies.
+2. Ở cell cấu hình, kiểm tra `REPO_URL` và điền `SOURCE_COMMIT` của phiên bản đã push có benchmark đợt 3. Nếu dùng source từ Dataset, đặt `SOURCE_DIR` trỏ đến thư mục chứa `app/` và `requirements.txt`.
+3. Chạy các cell theo thứ tự. Notebook ghi phiên bản Python thực tế; nếu cần Python 3.12, đặt `BASE_PYTHON` trỏ tới interpreter 3.12 đã cài.
+4. Kiểm tra smoke test trước baseline. Mặc định smoke là 1 user × 25 vòng; baseline là concurrency 1/4/8, mỗi mức 100 vòng/user và lặp 3 lần. Mỗi lần chạy có 5 vòng warm-up/user riêng.
+5. Tải ZIP ở cell cuối, hoặc lấy thư mục `/kaggle/working/benchmark-results/<batch_id>/`.
+
+Mỗi lần đo dùng database SQLite mới và secret ngẫu nhiên, khởi động Uvicorn, chờ `/health`, rồi chạy benchmark. Server được dừng trong `finally` trước khi xóa database. Log nằm trong `runs/<run_label>/`; từng báo cáo có tên `smoke.json`, `c1-r1.json`, v.v. `environment.json` ghi cấu hình server/database và dấu vết mã nguồn. Không ghi secret vào báo cáo.
+
+`runs.csv` giữ từng lần baseline, kể cả lần lỗi hoặc chưa chạy. Ba biểu đồ trong `charts/` thể hiện throughput thành công, p95 từng method và tỷ lệ lỗi. Warm-up và smoke không gộp vào baseline; không lấy trung bình các p95 làm p95 gộp. Biểu đồ throughput/p95 chỉ dùng các lần hoàn tất có cấu hình khớp; CSV và biểu đồ lỗi vẫn giữ thông tin các lần còn lại.
+
+Nếu ngắt ma trận giữa chừng, có thể chạy tiếp cell tổng hợp/biểu đồ để xem kết quả đã có. Để chạy một batch mới, chạy lại từ cell cấu hình; notebook không ghi đè kết quả cũ. Khi kernel bị cưỡng bức tắt, `finally` không được bảo đảm chạy. Server và client cùng máy nên kết quả phản ánh cấu hình notebook đó.
+
 ## Kế hoạch Pha 2
 
 | Thuộc tính | Vấn đề cần kiểm chứng | Cải tiến dự kiến | Cách đo |
