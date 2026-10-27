@@ -1,120 +1,172 @@
 # Todo List API — Pha 1
 
-Dịch vụ quản lý công việc cá nhân. Mỗi tài khoản chỉ xem và sửa công việc của mình. API giao tiếp bằng JSON; Swagger UI có tại `/docs`, tài liệu OpenAPI JSON tại `/openapi.json` và bản đặc tả tĩnh trong [`openapi.json`](openapi.json).
+Dịch vụ RESTful API quản lý danh sách công việc cá nhân (Todo List) xây dựng trên nền tảng **FastAPI**, **SQLAlchemy** và **SQLite**, hỗ trợ đóng gói và triển khai an toàn bằng **Docker**.
 
-Bài toán đặt ra là xây dựng một hệ thống để mỗi người dùng có thể tạo công việc, theo dõi danh sách, cập nhật trạng thái hoàn thành và xóa những công việc không còn cần thiết.
+Mục tiêu cốt lõi của Pha 1 là phân tách dữ liệu tuyệt đối giữa các tài khoản: người dùng chỉ có thể thao tác trên công việc do chính mình tạo ra, không thể xem, sửa hoặc xóa dữ liệu của người khác ngay cả khi biết chính xác ID.
 
-Yêu cầu quan trọng nhất là tách biệt dữ liệu giữa các tài khoản. Người dùng chỉ được xem và thao tác trên công việc của mình. Ví dụ, tài khoản A tạo một công việc thì tài khoản B không được xem, cập nhật hay xóa công việc đó, kể cả khi biết ID.
+---
 
+## 1. Nghiệp vụ & Phạm vi (Pha 1)
 
-## Phạm vi nghiệp vụ
+- **Xác thực:** Đăng ký tài khoản bằng email (không phân biệt chữ hoa/thường) và mật khẩu; đăng nhập nhận token JWT (Bearer token, hạn 60 phút).
+- **Quản lý công việc (CRUD):**
+  - Tạo công việc mới (tiêu đề bắt buộc, mô tả tùy chọn).
+  - Lấy danh sách công việc của tài khoản (sắp xếp theo ID giảm dần).
+  - Xem chi tiết công việc.
+  - Cập nhật trạng thái hoàn thành (`is_done: true/false`).
+  - Xóa công việc.
+- **Bảo mật dữ liệu:** Truy cập công việc thuộc tài khoản khác hoặc không tồn tại đều trả về mã `404 Not Found`.
 
-- Đăng ký bằng email và mật khẩu; email không phân biệt hoa thường, không được trùng.
-- Đăng nhập nhận Bearer token có hạn 60 phút.
-- Tạo, xem danh sách, xem chi tiết, đánh dấu hoàn thành/chưa hoàn thành và xóa công việc.
-- Danh sách sắp xếp theo ID giảm dần (mới trước). Truy cập ID của người khác trả `404`.
-- Pha 1 chưa có hạn chót, nhãn, chia sẻ, phân trang hay làm mới token.
+---
 
-## Kiến trúc
+## 2. Kiến trúc 3 tầng (Layered Architecture)
+
+Ứng dụng được thiết kế phân tầng rõ ràng nhằm đảm bảo tính độc lập và khả năng kiểm thử:
 
 ```text
-HTTP/JSON (app/factory.py, app/api/schemas.py)
-    ↓
-Nghiệp vụ (app/domain/services.py, models.py, ports.py)
-    ↓ qua các Protocol repository
-Truy cập dữ liệu (app/infrastructure/repositories.py)
-    ↓
-SQLAlchemy ORM → SQLite
+[ Tầng API / Application ]
+  ├── FastAPI Routing, Dependency Injection (app/factory.py, app/main.py)
+  └── Pydantic Schemas & Validation (app/api/schemas.py)
+              ↓
+[ Tầng Nghiệp vụ (Domain) ]
+  ├── Entity Models (app/domain/models.py)
+  ├── Business Logic (app/domain/services.py)
+  └── Repository Ports / Protocol (app/domain/ports.py)
+              ↓
+[ Tầng Hạ tầng (Infrastructure) ]
+  ├── Repository Implementations (app/infrastructure/repositories.py)
+  ├── Database Engine & SQLAlchemy Tables (app/infrastructure/database.py, tables.py)
+  └── Security: PBKDF2 Password Hasher & PyJWT Codec (app/infrastructure/security.py)
+              ↓
+         SQLite Database (data/todo.db)
 ```
 
-Tầng `domain` chỉ dùng thư viện chuẩn Python; không import FastAPI, Pydantic hoặc SQLAlchemy. `factory.py` nối các tầng qua dependency injection. Middleware kiểm tra Bearer token tập trung cho mọi đường dẫn `/api/tasks`; endpoint chỉ nhận `user_id` đã được middleware xác minh. Mật khẩu được băm PBKDF2-SHA256 với salt ngẫu nhiên; token JWT được ký HS256. Mỗi truy vấn công việc luôn lọc theo `user_id`.
+- **Domain:** Thuần Python chuẩn (standard library), hoàn toàn không phụ thuộc vào FastAPI, SQLAlchemy hay framework ngoài.
+- **Application:** Khởi tạo qua `factory.py`, kiểm soát xác thực token qua middleware tập trung trước khi chuyển tiếp `user_id` đã xác thực vào service.
+- **Infrastructure:** Quản lý ánh xạ ORM tới cơ sở dữ liệu SQLite và thuật toán mã hóa mật khẩu PBKDF2 với salt ngẫu nhiên.
 
-## Chạy cục bộ
+---
 
-Yêu cầu Python 3.12. Từ thư mục dự án:
+## 3. Công nghệ & Yêu cầu môi trường
 
+- **Ngôn ngữ:** Python 3.12+
+- **Framework & Thư viện chính:**
+  - `fastapi` & `uvicorn`: Web framework và ASGI server
+  - `SQLAlchemy`: ORM quản lý dữ liệu
+  - `PyJWT`: Ký và xác thực token JWT (thuật toán HS256)
+  - `pytest` & `httpx`: Kiểm thử tự động
+- **Cơ sở dữ liệu:** SQLite
+- **Triển khai:** Docker (chạy non-root user `appuser`, volume SQLite bền vững)
+
+---
+
+## 4. Đặc tả API (8 Endpoints)
+
+API giao tiếp bằng định dạng JSON. Tất cả endpoint công việc yêu cầu header: `Authorization: Bearer <access_token>`.
+
+- **Swagger UI:** `http://localhost:8000/docs`
+- **OpenAPI JSON:** [`openapi.json`](openapi.json) hoặc `http://localhost:8000/openapi.json`
+
+| STT | Method | Endpoint | Xác thực | Mô tả | Mã thành công | Mã lỗi chính |
+|:---:|:---:|:---|:---:|:---|:---:|:---|
+| 1 | `GET` | `/health` | Không | Kiểm tra trạng thái hệ thống | `200` | — |
+| 2 | `POST` | `/api/auth/register` | Không | Đăng ký tài khoản mới | `201` | `400`, `409`, `422` |
+| 3 | `POST` | `/api/auth/login` | Không | Đăng nhập lấy access token | `200` | `401`, `422` |
+| 4 | `GET` | `/api/tasks` | `BearerAuth` | Lấy danh sách công việc của user | `200` | `401` |
+| 5 | `POST` | `/api/tasks` | `BearerAuth` | Tạo công việc mới | `201` | `400`, `401`, `422` |
+| 6 | `GET` | `/api/tasks/{task_id}` | `BearerAuth` | Xem chi tiết 1 công việc | `200` | `401`, `404` |
+| 7 | `PATCH` | `/api/tasks/{task_id}` | `BearerAuth` | Đổi trạng thái hoàn thành (`is_done`) | `200` | `401`, `404`, `422` |
+| 8 | `DELETE`| `/api/tasks/{task_id}` | `BearerAuth` | Xóa một công việc | `204` | `401`, `404` |
+
+---
+
+## 5. Hướng dẫn chạy và Triển khai
+
+### Cách 1: Chạy bằng Docker (Khuyên dùng)
+
+Container được thiết lập chạy bằng **non-root user** (`appuser`), dữ liệu SQLite được lưu bền vững qua Docker Volume:
+
+```bash
+# 1. Build Docker image
+docker build -t todo-list-api .
+
+# 2. Khởi chạy container với volume lưu trữ dữ liệu
+docker run -d \
+  --name todo-api \
+  -p 8000:8000 \
+  -e TOKEN_SECRET="thay-bang-chuoi-ngau-nhien-it-nhat-32-ky-tu" \
+  -v todo-data:/app/data \
+  todo-list-api
+```
+
+> **Lưu ý về tính bền vững:** File dữ liệu `todo.db` nằm tại `/app/data/todo.db`. Khi dừng hoặc xóa container (`docker rm -f todo-api`), toàn bộ dữ liệu người dùng và công việc vẫn được bảo toàn nguyên vẹn trong volume `todo-data`.
+
+### Cách 2: Chạy trực tiếp cục bộ (Local)
+
+**Trên Windows (PowerShell):**
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements-dev.txt
-$env:TOKEN_SECRET = "thay-bang-chuoi-ngau-nhien-it-nhat-32-ky-tu"
-uvicorn app.main:app --reload
+
+$env:TOKEN_SECRET = "chuoi-bi-mat-ngau-nhien-it-nhat-32-ky-tu"
+uvicorn app.main:app --reload --port 8000
 ```
 
-Linux/macOS: kích hoạt bằng `source .venv/bin/activate`, đặt biến bằng `export TOKEN_SECRET='...'`. Mặc định dữ liệu nằm tại `data/todo.db`; có thể đổi bằng `DATABASE_URL`. Schema SQLite được tạo khi server khởi động. `TOKEN_SECRET` bắt buộc và phải có ít nhất 32 ký tự; giữ cùng giá trị giữa các lần khởi động nếu muốn token cũ còn hiệu lực.
+**Trên Linux / macOS:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
 
-## Docker
-
-```powershell
-docker build -t todo-list-api .
-docker run --rm -p 8000:8000 -e TOKEN_SECRET="thay-bang-chuoi-ngau-nhien-it-nhat-32-ky-tu" -v todo-data:/app/data todo-list-api
+export TOKEN_SECRET="chuoi-bi-mat-ngau-nhien-it-nhat-32-ky-tu"
+uvicorn app.main:app --reload --port 8000
 ```
 
-Mở `http://localhost:8000/docs`. Volume `todo-data` lưu SQLite qua các lần chạy container. Không commit secret hay file DB.
+---
 
-## Đặc tả endpoint
+## 6. Chạy Kiểm thử (Testing)
 
-Tất cả request body dùng `Content-Type: application/json`. Các endpoint công việc yêu cầu `Authorization: Bearer <access_token>`.
-
-| Method | Đường dẫn | Body | Thành công | Lỗi chính |
-|---|---|---|---|---|
-| GET | `/health` | — | `200 {"status":"ok"}` | — |
-| POST | `/api/auth/register` | `{"email":"a@example.com","password":"secret123"}` | `201` tài khoản `{id,email}` | `400/422` dữ liệu sai; `409` email trùng |
-| POST | `/api/auth/login` | `{"email":"a@example.com","password":"secret123"}` | `200 {access_token,token_type}` | `401` sai thông tin |
-| GET | `/api/tasks` | — | `200` mảng công việc của chủ token | `401` thiếu/sai token |
-| POST | `/api/tasks` | `{"title":"Mua sữa","description":"Tùy chọn"}` | `201` công việc vừa tạo | `400/422` tiêu đề sai; `401` |
-| GET | `/api/tasks/{task_id}` | — | `200` một công việc | `401`; `404` không có/không sở hữu |
-| PATCH | `/api/tasks/{task_id}` | `{"is_done":true}` | `200` công việc sau cập nhật | `401`; `404`; `422` |
-| DELETE | `/api/tasks/{task_id}` | — | `204` không có body | `401`; `404` |
-
-Một công việc có dạng:
-
-```json
-{
-  "id": 1,
-  "user_id": 1,
-  "title": "Mua sữa",
-  "description": "Tùy chọn",
-  "is_done": false,
-  "created_at": "2026-10-07T10:00:00Z"
-}
-```
-
-Thời gian `created_at` là UTC. `description` có thể là `null`. Lỗi nghiệp vụ trả `{"detail":"..."}`; lỗi kiểm tra schema của FastAPI trả `422` theo định dạng mặc định của framework.
-
-### Ví dụ luồng gọi
+Chạy kiểm thử tự động bao phủ xác thực JWT, bảo vệ endpoint và phân lập dữ liệu giữa các tài khoản:
 
 ```bash
-curl -X POST http://localhost:8000/api/auth/register -H "Content-Type: application/json" -d '{"email":"a@example.com","password":"secret123"}'
-curl -X POST http://localhost:8000/api/auth/login -H "Content-Type: application/json" -d '{"email":"a@example.com","password":"secret123"}'
-curl -X POST http://localhost:8000/api/tasks -H "Authorization: Bearer <access_token>" -H "Content-Type: application/json" -d '{"title":"Mua sữa"}'
-curl http://localhost:8000/api/tasks -H "Authorization: Bearer <access_token>"
+python -m pytest -q
 ```
 
-## Kiểm thử
+---
 
-```bash
-pytest -q
-```
+## 7. Kiểm thử tải trên Kaggle CPU (Benchmark)
 
-Các kiểm thử bao phủ đăng nhập, từ chối GET/POST không có token, CRUD, phân tách dữ liệu giữa hai tài khoản và khai báo bảo mật trong OpenAPI.
+Kịch bản đo lường hiệu năng tải được định nghĩa tại [`kaggle/benchmark.py`](kaggle/benchmark.py). Kịch bản tạo tài khoản và thực hiện lặp liên tục chu trình (POST $\rightarrow$ GET $\rightarrow$ DELETE).
 
-### Kiểm thử tải trên Kaggle CPU
+### Cách thực hiện trên Kaggle Notebook:
+1. Tạo Kaggle Notebook (Accelerator: None / CPU).
+2. Cài đặt phụ thuộc: `pip install -r requirements.txt`.
+3. Chạy backend Uvicorn dưới nền.
+4. Chạy script đo lường với các mức concurrency:
+   ```bash
+   python kaggle/benchmark.py --concurrency 1 --iterations 25
+   python kaggle/benchmark.py --concurrency 4 --iterations 25
+   python kaggle/benchmark.py --concurrency 8 --iterations 25
+   ```
 
-1. Tạo notebook với Accelerator `None` (CPU). Đưa thư mục dự án vào notebook; nếu cài từ PyPI, bật Internet cho notebook hoặc đính kèm các wheel phụ thuộc.
-2. Trong notebook, chuyển đến thư mục dự án và chạy `pip install -r requirements.txt`.
-3. Khởi động API bằng `subprocess.Popen(["uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8000"], env={**os.environ, "TOKEN_SECRET": "<secret-dai-it-nhat-32-ky-tu>"})`; chờ `/health` trả `200`.
-4. Chạy `python kaggle/benchmark.py --concurrency 1 --iterations 25`, sau đó lặp với `--concurrency 4` và `8`. Ghi lại loại CPU, phiên bản Python, số worker Uvicorn, thông số lệnh, throughput, p50/p95 từng method và số lỗi HTTP. Script tạo tài khoản ngoài phần đo, rồi mỗi vòng POST → GET → DELETE.
+### Bảng kết quả đo lường (Chờ số liệu từ Người 3):
 
-Giữ nguyên môi trường và số vòng khi so sánh. SQLite một file và một process Uvicorn là cấu hình cơ sở của Pha 1; kết quả đo là cơ sở để chọn cải tiến, không phải cam kết hiệu năng.
+| Mức tải (Concurrency) | Số vòng (Iterations) | Throughput (req/s) | p50 Latency (ms) | p95 Latency (ms) | Tỷ lệ lỗi (Error %) |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 1 | 25 | *(Đang cập nhật)* | *(Đang cập nhật)* | *(Đang cập nhật)* | 0% |
+| 4 | 25 | *(Đang cập nhật)* | *(Đang cập nhật)* | *(Đang cập nhật)* | 0% |
+| 8 | 25 | *(Đang cập nhật)* | *(Đang cập nhật)* | *(Đang cập nhật)* | 0% |
 
-## Kế hoạch Pha 2
+*(Bảng số liệu sẽ được Người 3 cập nhật sau khi hoàn tất phiên đo tải thực tế trên Kaggle).*
 
-| Thuộc tính | Vấn đề cần kiểm chứng | Cải tiến dự kiến | Cách đo |
+---
+
+## 8. Định hướng Kế hoạch Pha 2
+
+| Thuộc tính | Thách thức ở Pha 1 | Đề xuất cải tiến Pha 2 | Cách kiểm chứng |
 |---|---|---|---|
-| Hiệu năng | GET danh sách lớn và ghi đồng thời có thể chậm | Phân trang; chỉ mục theo `(user_id, id)`; cân nhắc PostgreSQL | p95 GET/POST, throughput và tỷ lệ lỗi ở cùng mức tải |
-| Tin cậy | SQLite không phù hợp nhiều writer; chưa có migration | PostgreSQL, Alembic migration, health check DB | Thử ghi đồng thời, khởi động lại, kiểm tra toàn vẹn dữ liệu |
-| Bảo mật | Token chưa thu hồi; chưa giới hạn đăng nhập | Refresh/revocation, rate limit, kiểm tra cấu hình secret | Thử token hết hạn/thu hồi, brute-force, truy cập chéo tài khoản |
-| Bảo trì | Khi tăng chức năng cần hợp đồng rõ hơn | Unit test nghiệp vụ, integration test DB, CI | Tỷ lệ pass và thời gian test trên mỗi commit |
-
-Đây là danh sách giả thuyết cho Pha 2; chọn ưu tiên sau khi có số liệu Kaggle CPU.
+| **Hiệu năng** | SQLite một writer giới hạn tốc độ ghi đồng thời | Chuyển sang PostgreSQL, đánh chỉ mục kép `(user_id, id)`, hỗ trợ phân trang cho danh sách task | Đo p95 latency và throughput khi tăng tải |
+| **Tin cậy** | Chưa có migration khi cập nhật schema | Tích hợp Alembic Migration, bổ sung health check sâu cho DB | Thử nghiệm migration dữ liệu tự động |
+| **Bảo mật** | Chưa có cơ chế thu hồi token trước hạn | Bổ sung Refresh Token / Token Blacklist, giới hạn tần suất gọi API (Rate Limiting) | Thử nghiệm token hết hạn/thu hồi và brute-force |
+| **Bảo trì** | Chưa tự động hóa quy trình kiểm thử | Xây dựng pipeline CI/CD (GitHub Actions) tự động chạy `pytest` khi mở Pull Request | Tỷ lệ pass test và thời gian phản hồi CI |
