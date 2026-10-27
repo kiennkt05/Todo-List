@@ -1,4 +1,97 @@
-# BUGS — Kết quả kiểm tra P0
+# BUGS — Kết quả kiểm tra P0 và P1
+
+## P1 — Kiểm thử nghiệp vụ, xác thực và ranh giới Domain
+
+Ngày thực hiện: **2026-10-27** (Asia/Bangkok).
+
+### Môi trường và phạm vi thay đổi
+
+- Baseline commit: `4bf04640509df50ea3acb3c405f18a61bf4db6bd`, branch `minhnq44-dev`.
+- Kết quả dưới đây áp dụng cho baseline cộng các thay đổi kiểm thử P1 trong working tree, chưa tạo commit mới.
+- Python **3.12.16**, pytest **8.3.5**, SQLite file tạm riêng cho từng test API qua `tmp_path`.
+- FastAPI **0.115.12**, SQLAlchemy **2.0.40**, PyJWT **2.10.1**, httpx **0.28.1**, Pydantic **2.14.1**, Starlette **0.46.2**, AnyIO **4.15.1**. Dependencies không đổi so với snapshot P0 bên dưới.
+- Đã đọc 3 test API và 2 test Domain có sẵn. Mở rộng các test CRUD/ownership hiện có; giữ test OpenAPI và 2 test Domain; chuyển các assertion thiếu/hỏng token sang ma trận xác thực để không viết trùng kịch bản.
+- Bổ sung các trường hợp API còn thiếu trong `tests/test_api.py` và 2 test kiến trúc trong `tests/test_architecture.py`. Tổng số trường hợp pytest thu thập tăng từ **5 lên 37** (bao gồm các biến thể parametrized).
+- Không thay đổi mã ứng dụng, schema API hoặc dependencies trong P1.
+
+### Lệnh chạy và kết quả tổng hợp
+
+Chạy tại thư mục gốc repository:
+
+```bash
+source .venv/bin/activate
+pytest -q -rA
+```
+
+`-rA` yêu cầu pytest liệt kê kết quả từng trường hợp, không thay đổi điều kiện pass/fail.
+
+Output tổng hợp thực tế:
+
+```text
+.....................................                                    [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/testclient.py:37
+  DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = typing.Callable[[], typing.ContextManager[anyio.abc.BlockingPortal]]
+
+37 passed, 1 warning in 6.64s
+```
+
+**Exit code 0; 37 passed; 0 failed; 0 errors; không có test skip/xfail.**
+
+| File | Số trường hợp pytest | Kết quả |
+|---|---:|---|
+| `tests/test_api.py` | 33 | 33 PASS |
+| `tests/test_domain.py` | 2 | 2 PASS |
+| `tests/test_architecture.py` | 2 | 2 PASS |
+| **Tổng** | **37** | **37 PASS** |
+
+Test kiến trúc còn chạy lại 2 unittest Domain trong subprocess cô lập. Hai lượt chạy nội bộ này không được cộng thêm vào con số 37 trường hợp pytest.
+
+### Đối chiếu yêu cầu P1 với kết quả từng nhóm test
+
+Tên test API trong bảng thuộc `tests/test_api.py`, trừ khi ghi đường dẫn khác.
+
+| Test / nhóm test | Số trường hợp | Nội dung và HTTP status đã xác nhận | Kết quả |
+|---|---:|---|---|
+| `test_authentication_and_task_lifecycle` | 1 | Đăng ký `201`, login `200`; tạo task `201`, đúng owner, trim title/description, mặc định chưa hoàn thành; GET chi tiết/danh sách `200`; PATCH `true` rồi `false` đều `200`, đọc lại xác nhận dữ liệu; danh sách mới nhất trước; DELETE `204` body rỗng; GET sau xóa `404`, task khác vẫn còn | PASS |
+| `test_owner_isolation_and_bad_credentials` | 1 | B list được `200 []`; B GET/PATCH/DELETE task của A đều `404`; sau từng thao tác A vẫn GET được `200` với toàn bộ task không đổi; sai mật khẩu `401`; email trùng nguyên bản/khác hoa thường/thừa khoảng trắng đều `409`; đăng ký trùng không ghi đè mật khẩu cũ | PASS |
+| `test_openapi_marks_protected_operations` | 1 | GET/POST tasks có `BearerAuth` trong OpenAPI; login không bị đánh dấu yêu cầu token; tái sử dụng test cũ | PASS |
+| `test_registration_normalizes_email_and_login_accepts_normalized_email` | 1 | Đăng ký email có chữ hoa và khoảng trắng trả email chuẩn hóa, chỉ có `id/email`; login bằng email ban đầu và email chuẩn hóa đều `200`, token type `bearer`; email chưa đăng ký trả `401` | PASS |
+| `test_registration_rejects_invalid_input` | 3 | `invalid-email`: `400`; `short-password` (7 ký tự): `422`; `missing-password`: `422`; kiểm tra kiểu chi tiết lỗi hoặc vị trí trường bị lỗi | PASS 3/3 |
+| `test_tasks_reject_invalid_authentication` | 14 | 7 dạng xác thực lỗi × GET/POST `/api/tasks`, chi tiết ở bảng bên dưới; đều `401`, có `WWW-Authenticate: Bearer` và thông báo lỗi; dùng token hợp lệ đọc lại xác nhận không tạo task ngoài ý muốn | PASS 14/14 |
+| `test_task_rejects_invalid_title` | 5 | `missing-title`, `null-title`, `empty-title`: `422`; `whitespace-title`: `400`; `too-long-title` (201 ký tự): `422`; kiểm tra chi tiết lỗi và không lưu task không hợp lệ | PASS 5/5 |
+| `test_task_accepts_maximum_title_length_and_null_description` | 1 | Title đúng 200 ký tự, description `null`: `201`; đọc lại task đúng nội dung | PASS |
+| `test_nonexistent_task_returns_not_found` | 3 | GET/PATCH/DELETE ID 999 trong DB mới đều `404`, body `{"detail":"Task not found"}` | PASS 3/3 |
+| `test_invalid_status_update_does_not_change_task` | 3 | Body `{}`, `{"is_done":null}`, `{"is_done":"not-a-boolean"}` đều `422`, lỗi chỉ đúng trường `is_done`; GET lại xác nhận toàn bộ task không đổi | PASS 3/3 |
+| `tests/test_domain.py::DomainTests::test_registration_and_login` | 1 | Giữ test cũ: chuẩn hóa email, login thành công; email trùng, sai mật khẩu và email sai gây đúng exception nghiệp vụ | PASS |
+| `tests/test_domain.py::DomainTests::test_task_ownership_and_validation` | 1 | Giữ test cũ: trim dữ liệu, đổi trạng thái, chặn truy cập/xóa chéo owner, từ chối title trắng, xóa thành công | PASS |
+| `tests/test_architecture.py::test_domain_imports_only_standard_library_and_domain_modules` | 1 | Quét AST các file Python trong `app/domain`; chỉ cho phép import thư viện chuẩn hoặc module Domain; không phụ thuộc API, infrastructure, FastAPI, SQLAlchemy hay Pydantic | PASS |
+| `tests/test_architecture.py::test_domain_tests_run_without_site_packages` | 1 | Chạy 2 unittest Domain bằng Python `-I -S`, không nạp site-packages và bỏ qua cấu hình/PYTHONPATH bên ngoài; dùng repository giả trong bộ nhớ; subprocess exit code 0 | PASS |
+
+### Ma trận JWT và GET/POST chưa xác thực
+
+Mỗi biến thể bên dưới được pytest thu thập riêng cho GET và POST. Token lỗi có cấu trúc JWT được tạo từ claim của token tài khoản thực vừa đăng ký. Token hết hạn được ký bằng đúng secret, có `iat` cách hiện tại 2 giờ và `exp` cách hiện tại 1 giờ; không dùng sleep hoặc chờ hết hạn thật.
+
+| Biến thể parametrized | Đầu vào | GET `/api/tasks` | POST `/api/tasks` |
+|---|---|---|---|
+| `missing` | Không có header Authorization | 401 — PASS | 401 — PASS |
+| `empty` | `Authorization: Bearer ` không có token | 401 — PASS | 401 — PASS |
+| `wrong-scheme` | Scheme `Basic` với token vốn hợp lệ | 401 — PASS | 401 — PASS |
+| `malformed` | `Bearer not-a-jwt` | 401 — PASS | 401 — PASS |
+| `wrong-signature` | JWT ký bằng secret khác | 401 — PASS | 401 — PASS |
+| `expired` | JWT đúng chữ ký nhưng đã hết hạn | 401 — PASS | 401 — PASS |
+| `missing-exp` | JWT đúng chữ ký nhưng thiếu claim `exp` | 401 — PASS | 401 — PASS |
+
+### Bugs và cảnh báo sau lần chạy P1
+
+- **Không có test P1 thất bại; không phát hiện bug mới trong các điều kiện được kiểm tra ở trên.** Các status `400/401/404/409/422` trong các kịch bản âm là kết quả mong đợi, không phải lỗi test.
+- **BUG-001: Fixed.** Pytest thu thập và chạy được toàn bộ 37 trường hợp với cấu hình `pytest.ini` hiện có; không tái xuất hiện `ModuleNotFoundError: No module named 'app'`.
+- **WARN-001: Open.** Vẫn có đúng 1 `DeprecationWarning` tại `starlette/testclient.py:37` khi import `TestClient`: Starlette 0.46.2 tham chiếu alias `anyio.abc.BlockingPortal` đã deprecated trong AnyIO 4.15.1. Đây là cảnh báo collection từ dependency, không phải lỗi của một test nghiệp vụ; không gây exit code khác 0. Tái hiện bằng lệnh chạy toàn bộ test ở trên. Hướng xử lý và bằng chứng gốc nằm ở phần WARN-001 của P0 bên dưới.
+
+Kết quả P1 chỉ xác nhận các kịch bản trong ma trận này. Những nhận xét ngoài phạm vi các assertion này từ lần rà soát mã nguồn trước đó không được coi là đã khắc phục chỉ vì bộ test pass.
+
+## Lịch sử kiểm tra P0
 
 Ngày kiểm tra: **2026-10-27** (Asia/Bangkok).
 
