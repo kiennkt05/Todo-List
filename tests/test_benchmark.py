@@ -1,7 +1,9 @@
 from http.client import IncompleteRead
+from datetime import datetime, timezone
 import io
 import json
 import sys
+import subprocess
 from threading import Event
 import urllib.error
 from unittest.mock import Mock
@@ -126,7 +128,7 @@ def test_main_writes_report_before_exiting(tmp_path, monkeypatch, capsys, scenar
             benchmark.main()
         assert error.value.code == 1
 
-    prepare.assert_called_once_with("http://127.0.0.1:8000")
+    prepare.assert_called_once_with("http://127.0.0.1:8000", timeout=30)
     text = destination.read_text(encoding="utf-8")
     assert "private-token-not-for-report" not in text
     report = json.loads(text)
@@ -318,7 +320,7 @@ def test_main_retains_partial_worker_and_other_workers(tmp_path, monkeypatch, ca
     monkeypatch.setattr(sys, "argv", ["benchmark.py", "--concurrency", "2", "--iterations", "1", "--output-json", str(destination)])
     monkeypatch.setattr(benchmark, "prepare_user", Mock(side_effect=["broken", "healthy"]))
 
-    def fake_request(base_url, method, path, body=None, token=None):
+    def fake_request(base_url, method, path, body=None, token=None, timeout=30):
         if method == "POST":
             return response_result(201, {"id": 42}, 1)
         if method == "GET" and token == "broken":
@@ -350,7 +352,7 @@ def test_main_saves_keyboard_interrupt_and_waits_for_partial_data(tmp_path, monk
     entered = Event()
     release = Event()
 
-    def fake_request(base_url, method, path, body=None, token=None):
+    def fake_request(base_url, method, path, body=None, token=None, timeout=30):
         if method == "POST":
             entered.set()
             assert release.wait(timeout=5)
@@ -382,3 +384,155 @@ def test_main_saves_keyboard_interrupt_and_waits_for_partial_data(tmp_path, monk
     assert report["unrecorded_requests"] == 297
     assert report["run_errors"][0]["error_type"] == "interrupted"
     assert "KeyboardInterrupt" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('dirty_output, expected_dirty', [('', False), (' M kaggle/benchmark.py\n', True)])
+def test_metadata_records_versions_and_git_state(monkeypatch, dirty_output, expected_dirty):
+    git = Mock(side_effect=[Mock(stdout='a' * 40 + '\n'), Mock(stdout=dirty_output)])
+    monkeypatch.setattr(benchmark.subprocess, 'run', git)
+    dist = Mock(metadata={'Name': 'FastAPI'}, version='0.115.12')
+    monkeypatch.setattr(benchmark.metadata, 'distributions', lambda: [dist])
+    monkeypatch.setenv('TOKEN_SECRET', 'must-not-appear')
+    result = benchmark.collect_metadata(2, 3, 10, 2)
+    assert result['git_commit'] == 'a' * 40
+    assert result['git_dirty'] is expected_dirty
+    assert result['dependency_versions'] == {'FastAPI': '0.115.12'}
+    assert result['python_version']
+    assert result['platform']
+    assert result['cpu_count'] is None or result['cpu_count'] > 0
+    assert result['timeout_seconds'] == 10
+    assert result['concurrency'] == 2 and result['iterations'] == 3
+    assert result['warmup_iterations'] == 2
+    assert datetime.fromisoformat(result['started_at_utc']).utcoffset() == timezone.utc.utcoffset(None)
+    assert 'must-not-appear' not in json.dumps(result)
+    assert 'base_url' not in result
+    assert git.call_args.kwargs['cwd'] == benchmark.Path(benchmark.__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize('error', [FileNotFoundError(), subprocess.CalledProcessError(128, 'git'), subprocess.TimeoutExpired('git', 5)])
+def test_metadata_without_git_is_still_available(monkeypatch, error):
+    monkeypatch.setattr(benchmark.subprocess, 'run', Mock(side_effect=error))
+    first = benchmark.collect_metadata(1, 1, 30, 0)
+    second = benchmark.collect_metadata(1, 1, 30, 0)
+    assert first['git_commit'] is None
+    assert first['git_dirty'] is None
+    assert first['run_id'] != second['run_id']
+    assert first['dependency_versions']
+
+
+@pytest.mark.parametrize('option, value', [
+    ('--timeout', '0'), ('--timeout', '-1'), ('--timeout', 'nan'),
+    ('--timeout', 'inf'), ('--warmup-iterations', '-1'),
+])
+def test_invalid_runtime_options_fail_before_network(monkeypatch, option, value):
+    monkeypatch.setattr(sys, 'argv', ['benchmark.py', option, value])
+    prepare = Mock()
+    monkeypatch.setattr(benchmark, 'prepare_user', prepare)
+    with pytest.raises(SystemExit) as exc:
+        benchmark.main()
+    assert exc.value.code == 2
+    prepare.assert_not_called()
+
+
+def test_credential_url_is_rejected_without_echoing_secrets(monkeypatch, capsys):
+    monkeypatch.setattr(sys, 'argv', ['benchmark.py', '--base-url', 'http://user:private-password@localhost'])
+    with pytest.raises(SystemExit) as exc:
+        benchmark.main()
+    assert exc.value.code == 2
+    assert 'private-password' not in capsys.readouterr().err
+
+
+def test_timeout_reaches_setup_and_all_task_requests(monkeypatch):
+    opener = Mock(side_effect=[
+        FakeResponse(201, b'{"id":1,"email":"test@example.com"}'),
+        FakeResponse(200, b'{"access_token":"private-token"}'),
+        FakeResponse(201, b'{"id":42}'), FakeResponse(200, b'[{"id":42}]'), FakeResponse(204, b''),
+    ])
+    monkeypatch.setattr(benchmark.urllib.request, 'urlopen', opener)
+    token = benchmark.prepare_user('http://test', timeout=0.5)
+    result = benchmark.worker('http://test', token, 1, 0, timeout=0.5)
+    assert result['completed_cycles'] == 1
+    assert opener.call_count == 5
+    assert all(call.kwargs['timeout'] == 0.5 for call in opener.call_args_list)
+
+
+def test_warmup_is_separate_and_its_time_is_excluded(tmp_path, monkeypatch):
+    destination = tmp_path / 'warmup.json'
+    monkeypatch.setattr(sys, 'argv', [
+        'benchmark.py', '--concurrency', '2', '--iterations', '3', '--warmup-iterations', '2',
+        '--timeout', '10', '--output-json', str(destination),
+    ])
+    prepare = Mock(return_value='private-token')
+    monkeypatch.setattr(benchmark, 'prepare_user', prepare)
+    calls = []
+
+    def fake_request(base_url, method, path, body=None, token=None, timeout=30):
+        calls.append((method, timeout))
+        if method == 'POST':
+            return response_result(201, {'id': 42}, 1)
+        if method == 'GET':
+            return response_result(200, [{'id': 42}], 2)
+        return response_result(204, None, 3)
+
+    monkeypatch.setattr(benchmark, 'request', fake_request)
+    # Each phase has its own start/end; the 100-second warm-up cannot enter the 2-second measurement.
+    monkeypatch.setattr(benchmark.time, 'perf_counter', Mock(side_effect=[10, 110, 200, 202]))
+    benchmark.main()
+    report = json.loads(destination.read_text())
+    assert report['run_status'] == 'completed'
+    assert report['warmup']['attempted_requests'] == 12
+    assert report['warmup']['completed_cycles'] == 4
+    assert report['warmup']['duration_seconds'] == 100
+    assert report['attempted_requests'] == report['successful_requests'] == 18
+    assert report['completed_cycles'] == 6
+    assert report['duration_seconds'] == 2
+    assert report['success_throughput'] == 9
+    assert len(report['measurements']) == 18
+    assert len(calls) == 30
+    assert all(timeout == 10 for _, timeout in calls)
+    assert all(call.kwargs['timeout'] == 10 for call in prepare.call_args_list)
+    assert report['timeout_seconds'] == 10
+    assert 'private-token' not in destination.read_text()
+
+
+@pytest.mark.parametrize('failure', ['http_error', 'consistency_error', 'unexpected', 'interrupted'])
+def test_failed_warmup_prevents_measurement(tmp_path, monkeypatch, failure):
+    destination = tmp_path / 'failed-warmup.json'
+    monkeypatch.setattr(sys, 'argv', [
+        'benchmark.py', '--concurrency', '1', '--iterations', '3', '--warmup-iterations', '1',
+        '--output-json', str(destination),
+    ])
+    monkeypatch.setattr(benchmark, 'prepare_user', Mock(return_value='token'))
+    calls = []
+
+    def fake_request(base_url, method, path, body=None, token=None, timeout=30):
+        calls.append(method)
+        if method == 'POST':
+            return response_result(201, {'id': 42}, 1)
+        if method == 'GET':
+            if failure == 'unexpected':
+                raise RuntimeError('warmup worker bug')
+            if failure == 'interrupted':
+                raise KeyboardInterrupt()
+            if failure == 'http_error':
+                return response_result(500, {}, 2)
+            return response_result(200, [], 2)
+        return response_result(204, None, 3)
+
+    monkeypatch.setattr(benchmark, 'request', fake_request)
+    with pytest.raises(SystemExit) as exc:
+        benchmark.main()
+    assert exc.value.code == 1
+    report = json.loads(destination.read_text())
+    assert report['run_status'] == 'aborted'
+    assert report['attempted_requests'] == 0
+    assert report['duration_seconds'] == 0
+    assert report['success_throughput'] is None
+    assert report['expected_requests'] == 9
+    assert report['measurements'] == []
+    assert report['warmup']['attempted_requests'] >= 1
+    assert report['run_errors'][-1]['stage'] == 'warmup'
+    assert calls.count('POST') == 1
+    if failure in ('http_error', 'consistency_error'):
+        assert calls[-1] == 'DELETE'
+        assert report['warmup']['failures_by_error_type'] == {failure: 1}

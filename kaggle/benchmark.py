@@ -2,15 +2,22 @@
 
 import argparse
 from collections import Counter
+from datetime import datetime, timezone
 from http.client import HTTPException
+from importlib import metadata
 import json
+import math
+import os
+import platform
 import statistics
+import subprocess
 import sys
 from threading import Event
 import time
 import traceback
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 import uuid
 from concurrent.futures import ThreadPoolExecutor, wait
 from pathlib import Path
@@ -46,7 +53,7 @@ def validate_payload(method, path, payload):
     return None
 
 
-def request(base_url, method, path, body=None, token=None, expected_status=None):
+def request(base_url, method, path, body=None, token=None, expected_status=None, timeout=30):
     """Classify expected transport/response errors; let programming errors propagate."""
     expected_status = EXPECTED_STATUS[method] if expected_status is None else expected_status
     data = json.dumps(body).encode() if body is not None else None
@@ -61,7 +68,7 @@ def request(base_url, method, path, body=None, token=None, expected_status=None)
     start = time.perf_counter()
     try:
         try:
-            response = urllib.request.urlopen(req, timeout=30)
+            response = urllib.request.urlopen(req, timeout=timeout)
         except urllib.error.HTTPError as exc:
             # An HTTP error is still a response. Do not require its body to be JSON.
             response = exc
@@ -109,23 +116,24 @@ class WorkerAborted(Exception):
         self.cause = cause
 
 
-def prepare_user(base_url):
+def prepare_user(base_url, timeout=30):
     email = f"bench-{uuid.uuid4().hex}@example.com"
     registered = request(
-        base_url, "POST", "/api/auth/register", {"email": email, "password": "benchmark-pass-123"}
+        base_url, "POST", "/api/auth/register", {"email": email, "password": "benchmark-pass-123"},
+        timeout=timeout,
     )
     if not registered["success"]:
         raise SetupError("register", registered)
     logged_in = request(
         base_url, "POST", "/api/auth/login", {"email": email, "password": "benchmark-pass-123"},
-        expected_status=200,
+        expected_status=200, timeout=timeout,
     )
     if not logged_in["success"]:
         raise SetupError("login", logged_in)
     return logged_in["payload"]["access_token"]
 
 
-def worker(base_url, token, iterations, worker_id, stop_event=None):
+def worker(base_url, token, iterations, worker_id, stop_event=None, timeout=30):
     result = {"measurements": [], "completed_cycles": 0, "skipped_requests": 0}
 
     def record(iteration, method, response):
@@ -139,18 +147,19 @@ def worker(base_url, token, iterations, worker_id, stop_event=None):
             if stop_event is not None and stop_event.is_set():
                 break
             created = request(
-                base_url, "POST", "/api/tasks", {"title": f"Benchmark task {index}"}, token
+                base_url, "POST", "/api/tasks", {"title": f"Benchmark task {index}"}, token,
+                timeout=timeout,
             )
             record(index, "POST", created)
             if not created["success"]:
                 result["skipped_requests"] += 2
                 continue
             task_id = created["payload"]["id"]
-            listed = request(base_url, "GET", "/api/tasks", token=token)
+            listed = request(base_url, "GET", "/api/tasks", token=token, timeout=timeout)
             if listed["success"] and not any(item["id"] == task_id for item in listed["payload"]):
                 fail(listed, "consistency_error", "Created task missing from list")
             record(index, "GET", listed)
-            deleted = request(base_url, "DELETE", f"/api/tasks/{task_id}", token=token)
+            deleted = request(base_url, "DELETE", f"/api/tasks/{task_id}", token=token, timeout=timeout)
             record(index, "DELETE", deleted)
             if listed["success"] and deleted["success"]:
                 result["completed_cycles"] += 1
@@ -227,6 +236,13 @@ def summarize(results, duration, concurrency, iterations, run_errors=None):
 
 
 def print_report(report):
+    if "run_id" in report:
+        print(f"Run ID: {report['run_id']}; started_at_utc: {report['started_at_utc']}")
+        print(f"Timeout: {report['timeout_seconds']}s; warmup_iterations: {report['warmup_iterations']}")
+        if report["warmup"] is not None:
+            warmup = report["warmup"]
+            print(f"Warm-up: {warmup['run_status']}; requests: {warmup['attempted_requests']}; "
+                  f"completed_cycles: {warmup['completed_cycles']}")
     print(f"Run status: {report['run_status']}")
     print(f"Concurrency: {report['concurrency']}; cycles/user: {report['iterations']}")
     throughput = report["throughput_rps"]
@@ -266,44 +282,53 @@ def unexpected_error(stage, exc, worker_id=None):
     }
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
-    parser.add_argument("--concurrency", type=int, default=4)
-    parser.add_argument("--iterations", type=int, default=25, help="Create/list/delete cycles per user")
-    parser.add_argument("--output-json", type=Path, help="Save summary and per-request measurements as JSON")
-    args = parser.parse_args()
-    if args.concurrency < 1 or args.iterations < 1:
-        parser.error("concurrency and iterations must be positive")
-    base_url = args.base_url.rstrip("/")
+def collect_metadata(concurrency, iterations, timeout, warmup_iterations):
+    root = Path(__file__).resolve().parents[1]
+    commit = dirty = None
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True,
+            check=True, timeout=5,
+        ).stdout.strip() or None
+        dirty = bool(subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=normal"], cwd=root,
+            capture_output=True, text=True, check=True, timeout=5,
+        ).stdout.strip())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    versions = {
+        dist.metadata["Name"]: dist.version
+        for dist in metadata.distributions() if dist.metadata.get("Name")
+    }
+    return {
+        "run_id": str(uuid.uuid4()),
+        "started_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "git_commit": commit, "git_dirty": dirty,
+        "python_version": platform.python_version(),
+        "dependency_versions": dict(sorted(versions.items())),
+        "platform": platform.platform(), "cpu_count": os.cpu_count(),
+        "concurrency": concurrency, "iterations": iterations,
+        "timeout_seconds": timeout, "warmup_iterations": warmup_iterations,
+    }
 
+
+def run_phase(base_url, tokens, iterations, timeout, stage):
+    """Use the same workload for warm-up and measurement, with separate clocks/data."""
     results = []
     run_errors = []
     futures = {}
     pool = None
-    started = None
+    started = time.perf_counter()
     stop_event = Event()
-    stage = "setup"
-    worker_id = None
     try:
-        tokens = []
-        for worker_id in range(args.concurrency):
-            tokens.append(prepare_user(base_url))
-        stage = "measurement"
-        worker_id = None
-        started = time.perf_counter()
-        pool = ThreadPoolExecutor(max_workers=args.concurrency)
+        pool = ThreadPoolExecutor(max_workers=len(tokens))
         for index, token in enumerate(tokens):
-            future = pool.submit(worker, base_url, token, args.iterations, index, stop_event)
+            future = pool.submit(worker, base_url, token, iterations, index, stop_event, timeout)
             futures[future] = index
         wait(futures)
-    except SetupError as exc:
-        run_errors.append({
-            "stage": "setup", "worker_id": worker_id, "operation": exc.operation, **exc.result,
-        })
     except (Exception, KeyboardInterrupt) as exc:
         # Run boundary: keep the error visible, then save all available evidence.
-        run_errors.append(unexpected_error(stage, exc, worker_id))
+        run_errors.append(unexpected_error(stage, exc))
     finally:
         if run_errors:
             stop_event.set()
@@ -318,11 +343,67 @@ def main():
             results.append(future.result())
         except WorkerAborted as exc:
             results.append(exc.result)
-            run_errors.append(unexpected_error("worker", exc.cause, index))
+            run_errors.append(unexpected_error("worker" if stage == "measurement" else stage, exc.cause, index))
         except (Exception, KeyboardInterrupt) as exc:
-            run_errors.append(unexpected_error("worker", exc, index))
-    duration = time.perf_counter() - started if started is not None else 0.0
-    report = summarize(results, duration, args.concurrency, args.iterations, run_errors)
+            run_errors.append(unexpected_error("worker" if stage == "measurement" else stage, exc, index))
+    duration = time.perf_counter() - started
+    return summarize(results, duration, len(tokens), iterations, run_errors)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--concurrency", type=int, default=4)
+    parser.add_argument("--iterations", type=int, default=25, help="Measured cycles per user")
+    parser.add_argument("--warmup-iterations", type=int, default=0, help="Unmeasured warm-up cycles per user")
+    parser.add_argument("--timeout", type=float, default=30, help="HTTP socket timeout in seconds")
+    parser.add_argument("--output-json", type=Path, help="Save summary and per-request measurements as JSON")
+    args = parser.parse_args()
+    if args.concurrency < 1 or args.iterations < 1:
+        parser.error("concurrency and iterations must be positive")
+    if args.warmup_iterations < 0:
+        parser.error("warmup-iterations must be nonnegative")
+    if not math.isfinite(args.timeout) or args.timeout <= 0:
+        parser.error("timeout must be finite and greater than zero")
+    try:
+        url = urlsplit(args.base_url)
+        safe_url = url.scheme in ("http", "https") and url.hostname and not (
+            url.username is not None or url.password is not None or url.query or url.fragment
+        )
+    except ValueError:
+        safe_url = False
+    if not safe_url:
+        parser.error("base-url must be HTTP(S), without credentials, query or fragment")
+    base_url = args.base_url.rstrip("/")
+    run_metadata = collect_metadata(args.concurrency, args.iterations, args.timeout, args.warmup_iterations)
+    run_errors = []
+    warmup = None
+    worker_id = None
+    try:
+        tokens = []
+        for worker_id in range(args.concurrency):
+            tokens.append(prepare_user(base_url, timeout=args.timeout))
+    except SetupError as exc:
+        run_errors.append({
+            "stage": "setup", "worker_id": worker_id, "operation": exc.operation, **exc.result,
+        })
+    except (Exception, KeyboardInterrupt) as exc:
+        run_errors.append(unexpected_error("setup", exc, worker_id))
+
+    if not run_errors and args.warmup_iterations:
+        warmup = run_phase(base_url, tokens, args.warmup_iterations, args.timeout, "warmup")
+        if warmup["run_status"] != "completed":
+            run_errors.extend(warmup["run_errors"])
+            run_errors.append({
+                "stage": "warmup", "error_type": "warmup_failed",
+                "error_message": "Warm-up did not complete successfully; measurement was not started",
+            })
+    if run_errors:
+        report = summarize([], 0.0, args.concurrency, args.iterations, run_errors)
+    else:
+        report = run_phase(base_url, tokens, args.iterations, args.timeout, "measurement")
+    report.update(run_metadata)
+    report["warmup"] = warmup
     print_report(report)
     if args.output_json is not None:
         args.output_json.parent.mkdir(parents=True, exist_ok=True)

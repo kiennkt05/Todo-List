@@ -133,7 +133,7 @@ Các loại lỗi request:
 | `error_type` | Ý nghĩa |
 |---|---|
 | `http_error` | Status khác kỳ vọng; ưu tiên phân loại theo status ngay cả khi body lỗi không phải JSON |
-| `timeout` | Hết thời gian chờ kết nối hoặc đọc response (timeout hiện vẫn là 30 giây) |
+| `timeout` | Hết thời gian chờ kết nối hoặc đọc response (`--timeout`, mặc định 30 giây) |
 | `network_error` | Không kết nối được, kết nối bị đóng hoặc response bị ngắt khi đọc |
 | `invalid_response` | JSON lỗi, sai cấu trúc/thiếu ID hoặc token cần thiết, DELETE 204 có body |
 | `consistency_error` | GET trả 200 với danh sách hợp lệ nhưng không có task vừa tạo |
@@ -153,6 +153,35 @@ Chạy các test cho công cụ đo (mock timeout/lỗi mạng/response, báo c�
 ```bash
 python -m pytest -q tests/test_benchmark.py
 ```
+
+### Metadata, warm-up và timeout
+
+```bash
+python kaggle/benchmark.py \
+  --concurrency 2 \
+  --iterations 3 \
+  --warmup-iterations 2 \
+  --timeout 10 \
+  --output-json results/local-with-warmup.json
+```
+
+Thứ tự chạy: chuẩn bị tài khoản → warm-up trên các tài khoản đó → đợi tất cả worker warm-up hoàn tất → bắt đầu đo chính thức. Warm-up dùng cùng workload POST → GET → DELETE và được lưu riêng trong trường `warmup` (gồm bộ đếm, thời gian, request và lỗi). Với ví dụ trên, warm-up có **12 request / 4 vòng**, còn báo cáo cấp ngoài chỉ tính **18 request / 6 vòng**. `duration_seconds` và throughput ở cấp ngoài không bao gồm setup, thu thập metadata hoặc warm-up. Task warm-up được xóa sau mỗi vòng thành công.
+
+`--warmup-iterations` mặc định `0` (không warm-up, trường `warmup` là `null`), phải là số nguyên không âm. Nếu warm-up có lỗi HTTP, dữ liệu không nhất quán, lỗi bất ngờ hoặc bị ngắt, script lưu dữ liệu warm-up và dừng với `run_status=aborted`, `run_errors` có `stage=warmup`, exit code 1. Phần đo chính thức có 0 request và thời gian 0; không gộp số liệu warm-up vào đó. Nếu setup lỗi trước warm-up, `warmup` cũng là `null`.
+
+`--timeout` chấp nhận số giây dương, hữu hạn (ví dụ `0.5`, `10`, `30`); áp dụng cho đăng ký, đăng nhập, warm-up và phần đo. Đây là timeout socket của thư viện HTTP cho kết nối/đọc dữ liệu, không phải giới hạn thời gian cho toàn bộ đợt benchmark.
+
+Báo cáo có thêm metadata tại cấp ngoài:
+
+| Trường | Ý nghĩa |
+|---|---|
+| `run_id`, `started_at_utc` | UUID riêng cho mỗi lần chạy và thời điểm UTC trước setup, định dạng ISO 8601 kết thúc bằng `Z` |
+| `git_commit`, `git_dirty` | Commit và trạng thái thay đổi của repository chứa script; tính cả file chưa track, bỏ qua file bị Git ignore. Không lấy được giá trị thì ghi `null` |
+| `python_version`, `dependency_versions` | Python và tên/phiên bản các distribution đã cài trong môi trường **client benchmark**; không chứa URL cài đặt |
+| `platform`, `cpu_count` | Nền tảng và số CPU do `os.cpu_count()` báo cáo; không đồng nghĩa với quota CPU thực tế được cấp |
+| `concurrency`, `iterations`, `warmup_iterations`, `timeout_seconds` | Các tham số thực tế của lần chạy |
+
+Script đọc Git theo thư mục mã nguồn, không theo thư mục đang gọi lệnh, và vẫn chạy được khi Git không có hoặc mã được tải về dưới dạng ZIP. Metadata không thu thập biến môi trường, token, mật khẩu hoặc URL API; CLI từ chối base URL chứa thông tin đăng nhập, query hoặc fragment. Số worker Uvicorn, chính sách reset/dùng lại database và môi trường server cần được ghi riêng trong notebook; client không tự suy ra các thông tin này. Giữ cùng cấu hình warm-up, timeout và database khi so sánh các lần đo.
 
 ## Kế hoạch Pha 2
 
