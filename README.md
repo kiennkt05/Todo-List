@@ -271,14 +271,3 @@ Mỗi lần đo dùng database SQLite mới và secret ngẫu nhiên, khởi đ�
 `runs.csv` giữ từng lần baseline, kể cả lần lỗi hoặc chưa chạy. Ba biểu đồ trong `charts/` thể hiện throughput thành công, p95 từng method và tỷ lệ lỗi. Warm-up và smoke không gộp vào baseline; không lấy trung bình các p95 làm p95 gộp. Biểu đồ throughput/p95 chỉ dùng các lần hoàn tất có cấu hình khớp; CSV và biểu đồ lỗi vẫn giữ thông tin các lần còn lại.
 
 Nếu ngắt ma trận giữa chừng, có thể chạy tiếp cell tổng hợp/biểu đồ để xem kết quả đã có. Để chạy một batch mới, chạy lại từ cell cấu hình; notebook không ghi đè kết quả cũ. Khi kernel bị cưỡng bức tắt, `finally` không được bảo đảm chạy. Server và client cùng máy nên kết quả phản ánh cấu hình notebook đó.
-
----
-
-## 8. Định hướng Kế hoạch Pha 2
-
-| Thuộc tính | Thách thức ở Pha 1 | Đề xuất cải tiến Pha 2 | Cách kiểm chứng |
-|---|---|---|---|
-| **Hiệu năng** | SQLite một writer giới hạn tốc độ ghi đồng thời | Chuyển sang PostgreSQL, đánh chỉ mục kép `(user_id, id)`, hỗ trợ phân trang cho danh sách task | Đo p95 latency và throughput khi tăng tải |
-| **Tin cậy** | Chưa có migration khi cập nhật schema | Tích hợp Alembic Migration, bổ sung health check sâu cho DB | Thử nghiệm migration dữ liệu tự động |
-| **Bảo mật** | Chưa có cơ chế thu hồi token trước hạn | Bổ sung Refresh Token / Token Blacklist, giới hạn tần suất gọi API (Rate Limiting) | Thử nghiệm token hết hạn/thu hồi và brute-force |
-| **Bảo trì** | Chưa tự động hóa quy trình kiểm thử | Xây dựng pipeline CI/CD (GitHub Actions) tự động chạy `pytest` khi mở Pull Request | Tỷ lệ pass test và thời gian phản hồi CI |
