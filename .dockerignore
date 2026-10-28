@@ -1,7 +1,29 @@
+# Git & Virtual environments
 .git
+.gitignore
+.gitattributes
 .venv
-__pycache__
-.pytest_cache
-data
-tests
-*.pyc
+venv/
+env/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets & Environment variables (never include in build context)
+.env
+.env.*
+!.env.example
+
+# Local data & testing
+data/
+*.db
+*.sqlite3
+tests/
+
+# Kaggle / Scratch
+kaggle/
