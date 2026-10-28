@@ -2,6 +2,8 @@
 
 Batch: `20261027T154217Z-a5e499c1` — ngày 27/10/2026 (UTC).
 
+> **Trạng thái:** Batch đã hoàn tất, toàn bộ notebook, báo cáo JSON/CSV, log và biểu đồ đã được đưa vào repository và merge vào `main` ngày 28/10/2026. Phép đo dùng source commit `be8a8781d56f10d80a931bd053d48ef8d4508408`; không nên hiểu số liệu này là benchmark tự động của mọi commit mới hơn.
+
 ## 1. Kết quả chính
 
 Smoke và **9/9 lần baseline hoàn tất**, không ghi nhận request task thất bại. Baseline hoàn thành **3.900 chu trình / 11.700 request** POST → GET → DELETE. Throughput tăng ít khi tăng tải, trong khi độ trễ p95 tăng rõ rệt. Đây là bằng chứng workload đã chạy thành công ở các mức tải đã thử; chưa đủ để kết luận năng lực tối đa hoặc đáp ứng SLA.

@@ -1,13 +1,15 @@
-# BUGS — Kết quả kiểm tra P0 và P1
+# BUGS — Kết quả kiểm tra P0 và P1 (lịch sử)
+
+> **Trạng thái tài liệu:** Đây là hồ sơ kiểm thử tại thời điểm P0/P1 ngày 27/10/2026. Các thay đổi P1 đã được commit tại `26ea47b` và được merge vào `main` ngày 28/10/2026. Số liệu baseline, tên branch và mô tả working tree bên dưới được giữ để bảo toàn khả năng truy vết; hướng dẫn hiện hành nằm trong [README](README.md).
 
 ## P1 — Kiểm thử nghiệp vụ, xác thực và ranh giới Domain
 
-Ngày thực hiện: **2026-10-27** (Asia/Bangkok).
+Ngày thực hiện: **2026-10-27** (Asia/Ho_Chi_Minh).
 
 ### Môi trường và phạm vi thay đổi
 
 - Baseline commit: `4bf04640509df50ea3acb3c405f18a61bf4db6bd`, branch `minhnq44-dev`.
-- Kết quả dưới đây áp dụng cho baseline cộng các thay đổi kiểm thử P1 trong working tree, chưa tạo commit mới.
+- Kết quả dưới đây được đo trên baseline cộng các thay đổi kiểm thử P1 khi còn ở working tree; các thay đổi đó sau đó được commit tại `26ea47b`.
 - Python **3.12.16**, pytest **8.3.5**, SQLite file tạm riêng cho từng test API qua `tmp_path`.
 - FastAPI **0.115.12**, SQLAlchemy **2.0.40**, PyJWT **2.10.1**, httpx **0.28.1**, Pydantic **2.14.1**, Starlette **0.46.2**, AnyIO **4.15.1**. Dependencies không đổi so với snapshot P0 bên dưới.
 - Đã đọc 3 test API và 2 test Domain có sẵn. Mở rộng các test CRUD/ownership hiện có; giữ test OpenAPI và 2 test Domain; chuyển các assertion thiếu/hỏng token sang ma trận xác thực để không viết trùng kịch bản.

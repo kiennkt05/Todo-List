@@ -4,6 +4,13 @@ Dịch vụ RESTful API quản lý danh sách công việc cá nhân (Todo List)
 
 Mục tiêu cốt lõi của Pha 1 là phân tách dữ liệu tuyệt đối giữa các tài khoản: người dùng chỉ có thể thao tác trên công việc do chính mình tạo ra, không thể xem, sửa hoặc xóa dữ liệu của người khác ngay cả khi biết chính xác ID.
 
+## Tài liệu liên quan
+
+- [Đặc tả OpenAPI tĩnh](openapi.json) — hợp đồng của 8 endpoint.
+- [Báo cáo kiểm thử chức năng và lịch sử lỗi](BUGS.md) — bằng chứng P0/P1 và các cảnh báo dependency còn mở.
+- [Phân tích kiểm thử tải Kaggle](kaggle/KaggleTest.md) — phương pháp, dữ liệu từng lần chạy, biểu đồ và diễn giải.
+- [Notebook Kaggle](kaggle/load_test.ipynb) — tự động khởi động API, chạy smoke/baseline và xuất kết quả.
+
 ---
 
 ## 1. Nghiệp vụ & Phạm vi (Pha 1)
@@ -127,11 +134,20 @@ uvicorn app.main:app --reload --port 8000
 
 ## 6. Chạy Kiểm thử (Testing)
 
-Chạy kiểm thử tự động bao phủ xác thực JWT, bảo vệ endpoint và phân lập dữ liệu giữa các tài khoản:
+Bộ kiểm thử hiện tại thu thập **96 trường hợp**, bao phủ nghiệp vụ Domain, API/JWT, phân lập dữ liệu, ranh giới kiến trúc, công cụ benchmark và notebook Kaggle:
 
 ```bash
 python -m pytest -q
 ```
+
+Có thể chạy riêng các nhóm chính:
+
+```bash
+python -m pytest -q tests/test_api.py tests/test_domain.py tests/test_architecture.py
+python -m pytest -q tests/test_benchmark.py tests/test_load_test_notebook.py
+```
+
+Kết quả kiểm thử chức năng đã kiểm chứng và cảnh báo dependency được lưu trong [BUGS.md](BUGS.md).
 
 ---
 
@@ -139,24 +155,31 @@ python -m pytest -q
 
 Kịch bản đo lường hiệu năng tải được định nghĩa tại [`kaggle/benchmark.py`](kaggle/benchmark.py). Kịch bản tạo tài khoản và thực hiện lặp liên tục chu trình (POST $\rightarrow$ GET $\rightarrow$ DELETE).
 
-### Cách thực hiện trên Kaggle Notebook:
-1. Tạo Kaggle Notebook (Accelerator: None / CPU).
-2. Cài đặt phụ thuộc: `pip install -r requirements.txt`.
-3. Chạy backend Uvicorn dưới nền.
-4. Chạy script đo lường với các mức concurrency:
-   ```bash
-   python kaggle/benchmark.py --concurrency 1 --iterations 25
-   python kaggle/benchmark.py --concurrency 4 --iterations 25
-   python kaggle/benchmark.py --concurrency 8 --iterations 25
-   ```
+### Chạy nhanh bằng script
 
-### Bảng kết quả đo lường (Chờ số liệu từ Người 3):
+Sau khi API đang chạy tại `http://127.0.0.1:8000`, có thể chạy một lần đo thủ công:
 
-| Mức tải (Concurrency) | Số vòng (Iterations) | Throughput (req/s) | p50 Latency (ms) | p95 Latency (ms) | Tỷ lệ lỗi (Error %) |
+```bash
+python kaggle/benchmark.py \
+  --concurrency 4 \
+  --iterations 100 \
+  --warmup-iterations 5 \
+  --output-json results/run.json
+```
+
+Để tái lập đầy đủ ma trận chính thức, dùng [notebook Kaggle](kaggle/load_test.ipynb): concurrency 1/4/8, 100 vòng/user, 3 lần/mức và 5 vòng warm-up/user.
+
+### Kết quả batch `20261027T154217Z-a5e499c1`
+
+| Concurrency | Vòng/user × số lần | Throughput TB (req/s) | p50 gộp (ms) | p95 gộp (ms) | Tỷ lệ lỗi |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| 1 | 25 | *(Đang cập nhật)* | *(Đang cập nhật)* | *(Đang cập nhật)* | 0% |
-| 4 | 25 | *(Đang cập nhật)* | *(Đang cập nhật)* | *(Đang cập nhật)* | 0% |
-| 8 | 25 | *(Đang cập nhật)* | *(Đang cập nhật)* | *(Đang cập nhật)* | 0% |
+| 1 | 100 × 3 | 71.23 | 15.03 | 22.43 | 0.00% |
+| 4 | 100 × 3 | 77.05 | 28.20 | 136.66 | 0.00% |
+| 8 | 100 × 3 | 81.92 | 35.95 | 350.79 | 0.00% |
+
+Cả smoke test và **9/9 baseline** đều hoàn tất: 3.900 chu trình chính thức, 11.700 request task thành công và 0 request thất bại. Throughput chỉ tăng khoảng 15% từ concurrency 1 lên 8, trong khi p95 tăng mạnh; kết quả cho thấy độ trễ đuôi suy giảm khi tăng tải nhưng chưa xác định riêng SQLite là nút thắt.
+
+Số liệu trên lấy từ request gốc của ba lần chạy tại mỗi mức tải; smoke, warm-up, đăng ký và đăng nhập không được gộp vào baseline. Xem [báo cáo phân tích đầy đủ](kaggle/KaggleTest.md), [CSV tổng hợp](kaggle/20261027T154217Z-a5e499c1/runs.csv) và [thư mục bằng chứng](kaggle/20261027T154217Z-a5e499c1/).
 
 Để lưu báo cáo cùng dữ liệu từng request (thư mục cha được tạo tự động):
 
