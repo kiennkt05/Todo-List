@@ -1,0 +1,26 @@
+Run ID: ec516397-876e-4938-b0d5-4a425aafd494; started_at_utc: 2026-10-27T15:42:54.067318Z
+Timeout: 30.0s; warmup_iterations: 5
+Warm-up: completed; requests: 60; completed_cycles: 20
+Run status: completed
+Concurrency: 4; cycles/user: 100
+Elapsed: 16.31s; throughput: 73.6 req/s
+success_throughput: 73.58352749852442
+error_rate: 0.0
+expected_requests: 1200
+attempted_requests: 1200
+successful_requests: 1200
+failed_requests: 0
+skipped_requests: 0
+unrecorded_requests: 0
+expected_cycles: 400
+completed_cycles: 400
+incomplete_cycles: 0
+POST   n= 400 success= 400 mean=   53.9ms p50=   30.9ms p95=  127.1ms
+  failures_by_status: {}
+  failures_by_error_type: {}
+GET    n= 400 success= 400 mean=   26.0ms p50=    6.7ms p95=   61.6ms
+  failures_by_status: {}
+  failures_by_error_type: {}
+DELETE n= 400 success= 400 mean=   72.7ms p50=   41.7ms p95=  193.1ms
+  failures_by_status: {}
+  failures_by_error_type: {}

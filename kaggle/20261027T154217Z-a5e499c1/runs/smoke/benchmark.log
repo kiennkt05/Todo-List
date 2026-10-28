@@ -1,0 +1,26 @@
+Run ID: 9efe717e-6c90-4a45-a670-9cb04f1bee00; started_at_utc: 2026-10-27T15:42:43.038797Z
+Timeout: 30.0s; warmup_iterations: 5
+Warm-up: completed; requests: 15; completed_cycles: 5
+Run status: completed
+Concurrency: 1; cycles/user: 25
+Elapsed: 1.09s; throughput: 68.6 req/s
+success_throughput: 68.57961122416202
+error_rate: 0.0
+expected_requests: 75
+attempted_requests: 75
+successful_requests: 75
+failed_requests: 0
+skipped_requests: 0
+unrecorded_requests: 0
+expected_cycles: 25
+completed_cycles: 25
+incomplete_cycles: 0
+POST   n=  25 success=  25 mean=   19.3ms p50=   20.5ms p95=   22.8ms
+  failures_by_status: {}
+  failures_by_error_type: {}
+GET    n=  25 success=  25 mean=    4.8ms p50=    4.7ms p95=    5.4ms
+  failures_by_status: {}
+  failures_by_error_type: {}
+DELETE n=  25 success=  25 mean=   19.4ms p50=   20.5ms p95=   22.1ms
+  failures_by_status: {}
+  failures_by_error_type: {}

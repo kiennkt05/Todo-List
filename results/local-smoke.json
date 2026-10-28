@@ -1,0 +1,180 @@
+{
+  "concurrency": 2,
+  "iterations": 3,
+  "duration_seconds": 0.06493822199990973,
+  "throughput_rps": 277.18652352423544,
+  "expected_requests": 18,
+  "attempted_requests": 18,
+  "successful_requests": 18,
+  "failed_requests": 0,
+  "skipped_requests": 0,
+  "expected_cycles": 6,
+  "completed_cycles": 6,
+  "incomplete_cycles": 0,
+  "methods": {
+    "POST": {
+      "n": 6,
+      "mean_ms": 9.782508499938558,
+      "p50_ms": 6.163258000015048,
+      "p95_ms": 25.30217699950299
+    },
+    "GET": {
+      "n": 6,
+      "mean_ms": 3.2382253334617417,
+      "p50_ms": 1.8784000003506662,
+      "p95_ms": 5.404335000093852
+    },
+    "DELETE": {
+      "n": 6,
+      "mean_ms": 4.889463833327075,
+      "p50_ms": 4.9214660002689925,
+      "p95_ms": 7.310297999538307
+    }
+  },
+  "measurements": [
+    {
+      "worker_id": 0,
+      "iteration": 0,
+      "method": "POST",
+      "status": 201,
+      "latency_ms": 9.379969000292476,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 0,
+      "method": "GET",
+      "status": 200,
+      "latency_ms": 4.270644999451179,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 0,
+      "method": "DELETE",
+      "status": 204,
+      "latency_ms": 4.965049000020372,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 1,
+      "method": "POST",
+      "status": 201,
+      "latency_ms": 4.873863000284473,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 1,
+      "method": "GET",
+      "status": 200,
+      "latency_ms": 1.7773669997040997,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 1,
+      "method": "DELETE",
+      "status": 204,
+      "latency_ms": 4.9214660002689925,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 2,
+      "method": "POST",
+      "status": 201,
+      "latency_ms": 8.199281999623054,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 2,
+      "method": "GET",
+      "status": 200,
+      "latency_ms": 1.7266950007979176,
+      "success": true
+    },
+    {
+      "worker_id": 0,
+      "iteration": 2,
+      "method": "DELETE",
+      "status": 204,
+      "latency_ms": 3.4874749999289634,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 0,
+      "method": "POST",
+      "status": 201,
+      "latency_ms": 6.163258000015048,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 0,
+      "method": "GET",
+      "status": 200,
+      "latency_ms": 4.371910000372736,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 0,
+      "method": "DELETE",
+      "status": 204,
+      "latency_ms": 4.978289000064251,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 1,
+      "method": "POST",
+      "status": 201,
+      "latency_ms": 4.776501999913307,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 1,
+      "method": "GET",
+      "status": 200,
+      "latency_ms": 5.404335000093852,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 1,
+      "method": "DELETE",
+      "status": 204,
+      "latency_ms": 7.310297999538307,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 2,
+      "method": "POST",
+      "status": 201,
+      "latency_ms": 25.30217699950299,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 2,
+      "method": "GET",
+      "status": 200,
+      "latency_ms": 1.8784000003506662,
+      "success": true
+    },
+    {
+      "worker_id": 1,
+      "iteration": 2,
+      "method": "DELETE",
+      "status": 204,
+      "latency_ms": 3.6742060001415666,
+      "success": true
+    }
+  ]
+}
