@@ -177,9 +177,9 @@ python kaggle/benchmark.py \
 | 4 | 100 × 3 | 77.05 | 28.20 | 136.66 | 0.00% |
 | 8 | 100 × 3 | 81.92 | 35.95 | 350.79 | 0.00% |
 
-Cả smoke test và **9/9 baseline** đều hoàn tất: 3.900 chu trình chính thức, 11.700 request task thành công và 0 request thất bại. Throughput chỉ tăng khoảng 15% từ concurrency 1 lên 8, trong khi p95 tăng mạnh; kết quả cho thấy độ trễ đuôi suy giảm khi tăng tải nhưng chưa xác định riêng SQLite là nút thắt.
+Cả smoke test và **9/9 baseline** đều hoàn tất: 3.900 chu trình chính thức, 11.700 request task thành công và 0 request thất bại. Throughput chỉ tăng khoảng 15% từ concurrency 1 lên 8, trong khi p95 tăng mạnh; kết quả cho thấy độ trễ đuôi suy giảm khi tăng tải.
 
-Số liệu trên lấy từ request gốc của ba lần chạy tại mỗi mức tải; smoke, warm-up, đăng ký và đăng nhập không được gộp vào baseline. Xem [báo cáo phân tích đầy đủ](kaggle/KaggleTest.md), [CSV tổng hợp](kaggle/20261027T154217Z-a5e499c1/runs.csv) và [thư mục bằng chứng](kaggle/20261027T154217Z-a5e499c1/).
+ Xem [báo cáo phân tích đầy đủ](kaggle/KaggleTest.md), [CSV tổng hợp](kaggle/20261027T154217Z-a5e499c1/runs.csv) và [thư mục bằng chứng](kaggle/20261027T154217Z-a5e499c1/).
 
 
 ### Hướng dẫn chạy kiểm thử tải trên Kaggle
