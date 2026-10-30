@@ -181,82 +181,8 @@ Cả smoke test và **9/9 baseline** đều hoàn tất: 3.900 chu trình chính
 
 Số liệu trên lấy từ request gốc của ba lần chạy tại mỗi mức tải; smoke, warm-up, đăng ký và đăng nhập không được gộp vào baseline. Xem [báo cáo phân tích đầy đủ](kaggle/KaggleTest.md), [CSV tổng hợp](kaggle/20261027T154217Z-a5e499c1/runs.csv) và [thư mục bằng chứng](kaggle/20261027T154217Z-a5e499c1/).
 
-Để lưu báo cáo cùng dữ liệu từng request (thư mục cha được tạo tự động):
 
-```bash
-python kaggle/benchmark.py --concurrency 2 --iterations 3 --output-json results/run.json
-```
-
-Mỗi bản ghi có `worker_id`, `iteration` (đều bắt đầu từ 0), `method`, `status`, `latency_ms`, `success`, `error_type` và `error_message`. `status` là `null` nếu chưa nhận được HTTP response. Request chỉ thành công khi status đúng, response hợp lệ và (với GET) thấy task vừa tạo. Không lưu body, mật khẩu hoặc token vào các bản ghi. Báo cáo JSON và terminal dùng chung dữ liệu tổng hợp:
-
-- `expected_requests`: `3 × concurrency × iterations`, không gồm đăng ký/login.
-- `attempted_requests`, `successful_requests`, `failed_requests`: số request task có bản ghi, thành công và thất bại, bao gồm cả timeout/lỗi mạng/response không hợp lệ.
-- `skipped_requests`: POST lỗi làm bỏ qua GET/DELETE, cộng 2 cho mỗi vòng đó.
-- `completed_cycles`: chỉ tăng khi tạo thành công, GET thành công và thấy task vừa tạo, DELETE thành công. GET lỗi hoặc không thấy task vẫn thử DELETE.
-- `expected_cycles`, `incomplete_cycles`: số vòng mục tiêu và số vòng không hoàn tất thành công.
-- `unrecorded_requests`: phần công việc chưa có bản ghi và không thuộc số request bị bỏ qua. Khi dừng sớm, không được coi số này là request thành công hoặc khẳng định chưa tới server.
-- `throughput_rps`: mọi request có bản ghi / thời gian đo; `success_throughput`: request thành công / thời gian đo, cùng đơn vị req/s. `error_rate`: request thất bại / request có bản ghi (từ 0 đến 1).
-- `methods`: `n` là mọi mẫu của method; `successful_requests`/`failed_requests` là số thành công/lỗi. Mean/p50/p95 **chỉ tính trên mẫu thành công**; không có mẫu thành công thì ghi `null` (terminal hiển thị `n/a`). `measurements` giữ dữ liệu từng request, kể cả lỗi.
-- `failures_by_status`, `failures_by_error_type`: số lỗi theo HTTP status và loại lỗi, có ở cấp toàn báo cáo và từng method. `no_response` nghĩa là chưa nhận status; status `200` vẫn có thể nằm trong nhóm lỗi nếu JSON sai hoặc thiếu task.
-
-Ví dụ trên khi thành công có 6 vòng hoàn thành, 18 request dự kiến/thực hiện/thành công, 0 request lỗi hoặc bị bỏ qua. Khi chưa đo được thời gian (setup thất bại), throughput là `null`; khi chưa có request task, `error_rate` là `null`.
-
-Các loại lỗi request:
-
-| `error_type` | Ý nghĩa |
-|---|---|
-| `http_error` | Status khác kỳ vọng; ưu tiên phân loại theo status ngay cả khi body lỗi không phải JSON |
-| `timeout` | Hết thời gian chờ kết nối hoặc đọc response (`--timeout`, mặc định 30 giây) |
-| `network_error` | Không kết nối được, kết nối bị đóng hoặc response bị ngắt khi đọc |
-| `invalid_response` | JSON lỗi, sai cấu trúc/thiếu ID hoặc token cần thiết, DELETE 204 có body |
-| `consistency_error` | GET trả 200 với danh sách hợp lệ nhưng không có task vừa tạo |
-
-Script không tự retry. POST thất bại bỏ qua hai bước còn lại; GET lỗi vẫn thử DELETE. Một task có thể còn lại nếu POST đã tới server nhưng client không nhận được ID, DELETE thất bại hoặc worker bị gián đoạn.
-
-`run_status` có ba giá trị:
-
-- `completed`: toàn bộ vòng thành công; exit code 0.
-- `completed_with_errors`: các worker kết thúc nhưng có request/vòng lỗi; exit code 1.
-- `aborted`: setup thất bại, worker gặp lỗi bất ngờ hoặc người chạy nhấn Ctrl+C; exit code 1. `run_errors` ghi giai đoạn (`setup`, `measurement`, `worker`), worker liên quan và nguyên nhân. Lỗi lập trình bất ngờ vẫn in traceback ra stderr.
-
-Khi một worker lỗi bất ngờ, báo cáo giữ các request đã ghi của worker đó và kết quả các worker khác. Khi nhận Ctrl+C, script hủy worker chưa chạy, chờ worker đang chạy kết thúc vòng hiện tại để thu dữ liệu rồi ghi báo cáo. Đăng ký/login không tính vào thống kê task; nếu setup lỗi, báo cáo `aborted` có 0 request task và chi tiết lỗi setup. Nếu có `--output-json`, báo cáo được ghi trước khi script trả exit code; bỏ tùy chọn này thì chỉ in terminal. Cần cho phép script kết thúc xử lý lỗi và ghi file: việc cưỡng bức kill tiến trình hoặc nơi lưu file không ghi được không bảo đảm có báo cáo.
-
-Chạy các test cho công cụ đo (mock timeout/lỗi mạng/response, báo cáo setup lỗi và worker gián đoạn):
-
-```bash
-python -m pytest -q tests/test_benchmark.py
-```
-
-### Metadata, warm-up và timeout
-
-```bash
-python kaggle/benchmark.py \
-  --concurrency 2 \
-  --iterations 3 \
-  --warmup-iterations 2 \
-  --timeout 10 \
-  --output-json results/local-with-warmup.json
-```
-
-Thứ tự chạy: chuẩn bị tài khoản → warm-up trên các tài khoản đó → đợi tất cả worker warm-up hoàn tất → bắt đầu đo chính thức. Warm-up dùng cùng workload POST → GET → DELETE và được lưu riêng trong trường `warmup` (gồm bộ đếm, thời gian, request và lỗi). Với ví dụ trên, warm-up có **12 request / 4 vòng**, còn báo cáo cấp ngoài chỉ tính **18 request / 6 vòng**. `duration_seconds` và throughput ở cấp ngoài không bao gồm setup, thu thập metadata hoặc warm-up. Task warm-up được xóa sau mỗi vòng thành công.
-
-`--warmup-iterations` mặc định `0` (không warm-up, trường `warmup` là `null`), phải là số nguyên không âm. Nếu warm-up có lỗi HTTP, dữ liệu không nhất quán, lỗi bất ngờ hoặc bị ngắt, script lưu dữ liệu warm-up và dừng với `run_status=aborted`, `run_errors` có `stage=warmup`, exit code 1. Phần đo chính thức có 0 request và thời gian 0; không gộp số liệu warm-up vào đó. Nếu setup lỗi trước warm-up, `warmup` cũng là `null`.
-
-`--timeout` chấp nhận số giây dương, hữu hạn (ví dụ `0.5`, `10`, `30`); áp dụng cho đăng ký, đăng nhập, warm-up và phần đo. Đây là timeout socket của thư viện HTTP cho kết nối/đọc dữ liệu, không phải giới hạn thời gian cho toàn bộ đợt benchmark.
-
-Báo cáo có thêm metadata tại cấp ngoài:
-
-| Trường | Ý nghĩa |
-|---|---|
-| `run_id`, `started_at_utc` | UUID riêng cho mỗi lần chạy và thời điểm UTC trước setup, định dạng ISO 8601 kết thúc bằng `Z` |
-| `git_commit`, `git_dirty` | Commit và trạng thái thay đổi của repository chứa script; tính cả file chưa track, bỏ qua file bị Git ignore. Không lấy được giá trị thì ghi `null` |
-| `python_version`, `dependency_versions` | Python và tên/phiên bản các distribution đã cài trong môi trường **client benchmark**; không chứa URL cài đặt |
-| `platform`, `cpu_count` | Nền tảng và số CPU do `os.cpu_count()` báo cáo; không đồng nghĩa với quota CPU thực tế được cấp |
-| `concurrency`, `iterations`, `warmup_iterations`, `timeout_seconds` | Các tham số thực tế của lần chạy |
-
-Script đọc Git theo thư mục mã nguồn, không theo thư mục đang gọi lệnh, và vẫn chạy được khi Git không có hoặc mã được tải về dưới dạng ZIP. Metadata không thu thập biến môi trường, token, mật khẩu hoặc URL API; CLI từ chối base URL chứa thông tin đăng nhập, query hoặc fragment. Số worker Uvicorn, chính sách reset/dùng lại database và môi trường server cần được ghi riêng trong notebook; client không tự suy ra các thông tin này. Giữ cùng cấu hình warm-up, timeout và database khi so sánh các lần đo.
-
-### Notebook chạy tải trên Kaggle
+### Hướng dẫn chạy kiểm thử tải trên Kaggle
 
 Notebook [kaggle/load_test.ipynb](kaggle/load_test.ipynb) quản lý server, chạy tải và xuất biểu đồ:
 
@@ -270,4 +196,3 @@ Mỗi lần đo dùng database SQLite mới và secret ngẫu nhiên, khởi đ�
 
 `runs.csv` giữ từng lần baseline, kể cả lần lỗi hoặc chưa chạy. Ba biểu đồ trong `charts/` thể hiện throughput thành công, p95 từng method và tỷ lệ lỗi. Warm-up và smoke không gộp vào baseline; không lấy trung bình các p95 làm p95 gộp. Biểu đồ throughput/p95 chỉ dùng các lần hoàn tất có cấu hình khớp; CSV và biểu đồ lỗi vẫn giữ thông tin các lần còn lại.
 
-Nếu ngắt ma trận giữa chừng, có thể chạy tiếp cell tổng hợp/biểu đồ để xem kết quả đã có. Để chạy một batch mới, chạy lại từ cell cấu hình; notebook không ghi đè kết quả cũ. Khi kernel bị cưỡng bức tắt, `finally` không được bảo đảm chạy. Server và client cùng máy nên kết quả phản ánh cấu hình notebook đó.
